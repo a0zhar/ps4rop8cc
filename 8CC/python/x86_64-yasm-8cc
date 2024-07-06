@@ -1,45 +1,73 @@
 #!/bin/bash
+#
+# SUMMERY:
+# This script converts C source files to x86_64 assembly using 8cc compiler and Yasm.
+#
 
+# Resolve the full path of the script
 self="$0"
 
-if [ "x${self:0:1}" != x/ ]
-then self="$PWD/$self"
+# If script path does not start with '/', prepend current working directory
+if [ "x${self:0:1}" != x/ ]; then
+    self="$PWD/$self"
 fi
 
+# Get the directory path of the script
 self="$(dirname "$self")"
 
+# Create a temporary directory
 temp="$(mktemp -d)"
 
-failure ()
-{
-    if [ "x$KEEPTEMP" == x ]
-    then rm -rf "$temp"
+# Function to handle failure and cleanup
+failure () {
+    # Remove temporary directory if KEEPTEMP is not set
+    if [ "x$KEEPTEMP" == x ]; then
+        rm -rf "$temp"
     fi
     exit 1
 }
 
+# Output file specified as first argument
 out_o="$1"
 shift
 
+# Compile the crt_native.c to assembly and output to temporary directory
 "$self/../8cc" "$self/../crt/crt_native.c" -S -o "$temp/pp.s" || failure
+
+# Copy the generated assembly to linked.s file in temporary directory
 cat "$temp/pp.s" > "$temp/linked.s" || failure
 
-while [ "x$1" != x ]
-do
-cat >> "$temp/pp.c" << EOF
+# Process each input file or source code
+while [ "x$1" != x ]; do
+    # Append necessary built-in functions to pp.c in temporary directory
+    cat >> "$temp/pp.c" << EOF
 unsigned short __builtin_bswap16(unsigned short);
 unsigned int __builtin_bswap32(unsigned int);
 unsigned long long __builtin_bswap64(unsigned long long);
 EOF
-cpp -DPRINTF_DISABLE_SUPPORT_FLOAT '-D__asm__(...)=' '-D__restrict=' '-D__extension__=' '-D__builtin_va_list=int' '-D__inline=' '-D__attribute__(x)=' -isystem "$self/../include" -P "$1" >> "$temp/pp.c" || failure
-"$self/../8cc" "$temp/pp.c" -S -o "$temp/pp.s" || failure
-cat "$temp/pp.s" >> "$temp/linked.s" || failure
-echo >> "$temp/linked.s" || failure
-shift
+
+    # Preprocess the C code and append to pp.c in temporary directory
+    cpp -DPRINTF_DISABLE_SUPPORT_FLOAT                                \
+        '-D__asm__(...)=' '-D__restrict=' '-D__extension__='          \
+        '-D__builtin_va_list=int' '-D__inline=' '-D__attribute__(x)=' \
+        -isystem "$self/../include" -P "$1" >> "$temp/pp.c" || failure
+    
+    # Compile preprocessed C code to assembly and append to linked.s
+    "$self/../8cc" "$temp/pp.c" -S -o "$temp/pp.s" || failure
+    cat "$temp/pp.s" >> "$temp/linked.s" || failure
+    echo >> "$temp/linked.s" || failure
+    
+    # Shift to the next argument
+    shift
 done
+
+# Convert linked.s to x64 assembly using nativecalls.py and s2x64.py, output to linked.asm
 python3 "$self/nativecalls.py" < "$temp/linked.s" | python3 "$self/s2x64.py" > "$temp/linked.asm" || failure
+
+# Assemble linked.asm to object file (.o) using Yasm
 yasm -f elf64 "$temp/linked.asm" -o "$out_o" || failure
 
-if [ "x$KEEPTEMP" == x ]
-then rm -rf "$temp"
+# Remove temporary directory if KEEPTEMP is not set
+if [ "x$KEEPTEMP" == x ]; then
+    rm -rf "$temp"
 fi
