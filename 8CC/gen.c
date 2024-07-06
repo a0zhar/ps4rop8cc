@@ -24,7 +24,7 @@ static int is_main;
 static Map *source_files = &EMPTY_MAP;
 static Map *source_lines = &EMPTY_MAP;
 static char *last_loc = "";
-static char* current_func_name;
+static char *current_func_name;
 
 static void emit_addr(Node *node);
 static void emit_expr(Node *node);
@@ -174,17 +174,17 @@ static void emit_gload(Type *ty, char *label, int off) {
     emit("mov B, %s", label);
     if (off)
         emit("add B, %d", MOD24(off));
-    emit("load%d A, B", ty->size*8);
-#if 0
+    emit("load%d A, B", ty->size * 8);
+    #if 0
     maybe_emit_bitshift_load(ty);
-#endif
+    #endif
 }
 
 static void emit_intcast(Type *ty) {
-    if(ty->usig)
-        emit("crop%d A", 8*ty->size);
+    if (ty->usig)
+        emit("crop%d A", 8 * ty->size);
     else
-        emit("icrop%d A", 8*ty->size);
+        emit("icrop%d A", 8 * ty->size);
 }
 
 static void emit_toint(Type *ty) {
@@ -209,7 +209,7 @@ static void emit_lload(Type *ty, char *base, int off) {
         emit("mov B, %s", base);
         if (off)
             emit("add B, %d", MOD24(off));
-        emit("load%d A, B", ty->size*8);
+        emit("load%d A, B", ty->size * 8);
     }
 }
 
@@ -223,15 +223,15 @@ static void emit_gsave(char *varname, Type *ty, int off) {
     SAVE;
     assert(ty->kind != KIND_ARRAY);
     maybe_convert_bool(ty);
-#if 0
+    #if 0
     char *reg = get_int_reg(ty, 'a');
     char *addr = format("%s+%d(%%rip)", varname, off);
     maybe_emit_bitshift_save(ty, addr);
-#endif
+    #endif
     emit("mov B, %s", varname);
     if (off)
         emit("add B, %d", MOD24(off));
-    emit("store%d A, B", ty->size*8);
+    emit("store%d A, B", ty->size * 8);
 }
 
 static void emit_lsave(Type *ty, int off) {
@@ -244,7 +244,7 @@ static void emit_lsave(Type *ty, int off) {
         emit("mov B, BP");
         if (off)
             emit("add B, %d", MOD24(off));
-        emit("store%d A, B", ty->size*8);
+        emit("store%d A, B", ty->size * 8);
     }
 }
 
@@ -253,7 +253,7 @@ static void do_emit_assign_deref(Type *ty, int off) {
     emit("load64 B, SP");
     if (off)
         emit("add A, %d", MOD24(off));
-    emit("store%d B, A", ty->size*8);
+    emit("store%d B, A", ty->size * 8);
     pop("A");
 }
 
@@ -281,9 +281,9 @@ static void emit_pointer_arith(char kind, Node *left, Node *right) {
     emit("mov B, A");
     pop("A");
     switch (kind) {
-    case '+': emit("add A, B"); break;
-    case '-': emit("sub A, B"); break;
-    default: error("invalid operator '%d'", kind);
+        case '+': emit("add A, B"); break;
+        case '-': emit("sub A, B"); break;
+        default: error("invalid operator '%d'", kind);
     }
     pop("B");
 }
@@ -309,59 +309,59 @@ static void ensure_lvar_init(Node *node) {
 static void emit_assign_struct_ref(Node *struc, Type *field, int off) {
     SAVE;
     switch (struc->kind) {
-    case AST_LVAR:
-        ensure_lvar_init(struc);
-        emit_lsave(field, struc->loff + field->offset + off);
-        break;
-    case AST_GVAR:
-        emit_gsave(struc->glabel, field, field->offset + off);
-        break;
-    case AST_STRUCT_REF:
-        emit_assign_struct_ref(struc->struc, field, off + struc->ty->offset);
-        break;
-    case AST_DEREF:
-        push("A");
-        emit_expr(struc->operand);
-        do_emit_assign_deref(field, field->offset + off);
-        break;
-    default:
-        error("internal error: %s", node2s(struc));
+        case AST_LVAR:
+            ensure_lvar_init(struc);
+            emit_lsave(field, struc->loff + field->offset + off);
+            break;
+        case AST_GVAR:
+            emit_gsave(struc->glabel, field, field->offset + off);
+            break;
+        case AST_STRUCT_REF:
+            emit_assign_struct_ref(struc->struc, field, off + struc->ty->offset);
+            break;
+        case AST_DEREF:
+            push("A");
+            emit_expr(struc->operand);
+            do_emit_assign_deref(field, field->offset + off);
+            break;
+        default:
+            error("internal error: %s", node2s(struc));
     }
 }
 
 static void emit_load_struct_ref(Node *struc, Type *field, int off) {
     SAVE;
     switch (struc->kind) {
-    case AST_LVAR:
-        ensure_lvar_init(struc);
-        emit_lload(field, "BP", struc->loff + field->offset + off);
-        break;
-    case AST_GVAR:
-        emit_gload(field, struc->glabel, field->offset + off);
-        break;
-    case AST_STRUCT_REF:
-        emit_load_struct_ref(struc->struc, field, struc->ty->offset + off);
-        break;
-    case AST_DEREF:
-        emit_expr(struc->operand);
-        emit_lload(field, "A", field->offset + off);
-        break;
-    default:
-        error("internal error: %s", node2s(struc));
+        case AST_LVAR:
+            ensure_lvar_init(struc);
+            emit_lload(field, "BP", struc->loff + field->offset + off);
+            break;
+        case AST_GVAR:
+            emit_gload(field, struc->glabel, field->offset + off);
+            break;
+        case AST_STRUCT_REF:
+            emit_load_struct_ref(struc->struc, field, struc->ty->offset + off);
+            break;
+        case AST_DEREF:
+            emit_expr(struc->operand);
+            emit_lload(field, "A", field->offset + off);
+            break;
+        default:
+            error("internal error: %s", node2s(struc));
     }
 }
 
 static void emit_store(Node *var) {
     SAVE;
     switch (var->kind) {
-    case AST_DEREF: emit_assign_deref(var); break;
-    case AST_STRUCT_REF: emit_assign_struct_ref(var->struc, var->ty, 0); break;
-    case AST_LVAR:
-        ensure_lvar_init(var);
-        emit_lsave(var->ty, var->loff);
-        break;
-    case AST_GVAR: emit_gsave(var->glabel, var->ty, 0); break;
-    default: error("internal error");
+        case AST_DEREF: emit_assign_deref(var); break;
+        case AST_STRUCT_REF: emit_assign_struct_ref(var->struc, var->ty, 0); break;
+        case AST_LVAR:
+            ensure_lvar_init(var);
+            emit_lsave(var->ty, var->loff);
+            break;
+        case AST_GVAR: emit_gsave(var->glabel, var->ty, 0); break;
+        default: error("internal error");
     }
 }
 
@@ -409,25 +409,25 @@ static void emit_binop_int_arith(Node *node) {
             break;
         case '/':
         {
-            const char* sn;
-            if(node->left->ty->usig)
+            const char *sn;
+            if (node->left->ty->usig)
                 sn = "";
             else
                 sn = "i";
-            emit("%scrop%d A", sn, 8*node->left->ty->size);
-            emit("%scrop%d B", sn, 8*node->right->ty->size);
+            emit("%scrop%d A", sn, 8 * node->left->ty->size);
+            emit("%scrop%d B", sn, 8 * node->right->ty->size);
             emit("%sdiv A, B", sn);
             break;
         }
         case '%':
         {
-            const char* sn;
-            if(node->left->ty->usig)
+            const char *sn;
+            if (node->left->ty->usig)
                 sn = "";
             else
                 sn = "i";
-            emit("%scrop%d A", sn, 8*node->left->ty->size);
-            emit("%scrop%d B", sn, 8*node->right->ty->size);
+            emit("%scrop%d A", sn, 8 * node->left->ty->size);
+            emit("%scrop%d B", sn, 8 * node->right->ty->size);
             emit("%smod A, B", sn);
             break;
         }
@@ -438,11 +438,11 @@ static void emit_binop_int_arith(Node *node) {
             emit("shl A, B");
             break;
         case OP_SAR:
-            emit("icrop%d A", 8*node->left->ty->size);
+            emit("icrop%d A", 8 * node->left->ty->size);
             emit("sar A, B");
             break;
         case OP_SHR:
-            emit("crop%d A", 8*node->left->ty->size);
+            emit("crop%d A", 8 * node->left->ty->size);
             emit("shr A, B");
             break;
         default: error("invalid operator '%d'", node->kind);
@@ -478,12 +478,12 @@ static void emit_ret() {
     /*if (is_main) {
         emit("exit");
     } else {*/
-        emit("mov SP, BP");
-        pop("A");
-        emit("mov BP, A");
-        pop("A");
-        emit("jmp A");
-        stackpos += 2;
+    emit("mov SP, BP");
+    pop("A");
+    emit("mov BP, A");
+    pop("A");
+    emit("jmp A");
+    stackpos += 2;
     //}
 }
 
@@ -494,10 +494,10 @@ static void emit_binop(Node *node) {
         return;
     }
     switch (node->kind) {
-    case '<': emit_comp("lt", node); return;
-    case OP_EQ: emit_comp("eq", node); return;
-    case OP_LE: emit_comp("le", node); return;
-    case OP_NE: emit_comp("ne", node); return;
+        case '<': emit_comp("lt", node); return;
+        case OP_EQ: emit_comp("eq", node); return;
+        case OP_LE: emit_comp("le", node); return;
+        case OP_NE: emit_comp("ne", node); return;
     }
     if (is_inttype(node->ty))
         emit_binop_int_arith(node);
@@ -510,51 +510,52 @@ static void emit_binop(Node *node) {
 static void emit_save_literal(Node *node, Type *totype, int off) {
     int v = node->ival;
     switch (totype->kind) {
-    case KIND_BOOL:
-        v = !!v;
-    case KIND_CHAR:
-    case KIND_SHORT:
-    case KIND_INT:
-    case KIND_LONG:
-    case KIND_LLONG:
-    case KIND_PTR: {
-        emit("mov B, BP");
-        if (off)
-            emit("add B, %d", MOD24(off));
-        emit("mov A, %d", MOD24(v));
-        emit("store%d A, B", totype->size*8);
-        break;
-    }
-    case KIND_FLOAT:
-    case KIND_DOUBLE:
-        assert_float();
-    default:
-        error("internal error: <%s> <%s> <%d>", node2s(node), ty2s(totype), off);
+        case KIND_BOOL:
+            v = !!v;
+        case KIND_CHAR:
+        case KIND_SHORT:
+        case KIND_INT:
+        case KIND_LONG:
+        case KIND_LLONG:
+        case KIND_PTR:
+        {
+            emit("mov B, BP");
+            if (off)
+                emit("add B, %d", MOD24(off));
+            emit("mov A, %d", MOD24(v));
+            emit("store%d A, B", totype->size * 8);
+            break;
+        }
+        case KIND_FLOAT:
+        case KIND_DOUBLE:
+            assert_float();
+        default:
+            error("internal error: <%s> <%s> <%d>", node2s(node), ty2s(totype), off);
     }
 }
 
 static void emit_addr(Node *node) {
     switch (node->kind) {
-    case AST_LVAR:
-        ensure_lvar_init(node);
-        emit("mov A, BP");
-        emit("add A, %d", node->loff);
-        break;
-    case AST_GVAR:
-        emit("mov A, %s", node->glabel);
-        break;
-    case AST_DEREF:
-        emit_expr(node->operand);
-        break;
-    case AST_STRUCT_REF:
-        emit_addr(node->struc);
-        emit("add A, %d", node->ty->offset);
-        break;
-    case AST_FUNCDESG:
-        emit("mov A, %s", node->fname);
-        break;
-    default:
-        error("internal error: %s", node2s(node));
+        case AST_LVAR:
+            ensure_lvar_init(node);
+            emit("mov A, BP");
+            emit("add A, %d", node->loff);
+            break;
+        case AST_GVAR:
+            emit("mov A, %s", node->glabel);
+            break;
+        case AST_DEREF:
+            emit_expr(node->operand);
+            break;
+        case AST_STRUCT_REF:
+            emit_addr(node->struc);
+            emit("add A, %d", node->ty->offset);
+            break;
+        case AST_FUNCDESG:
+            emit("mov A, %s", node->fname);
+            break;
+        default:
+            error("internal error: %s", node2s(node));
     }
 }
 
@@ -622,7 +623,7 @@ static void emit_decl_init(Vector *inits, int off, int totalsize) {
 
 static void emit_pre_inc_dec(Node *node, char *op) {
     emit_expr(node->operand);
-    if(node->ty->kind == KIND_PTR)
+    if (node->ty->kind == KIND_PTR)
         emit("%s A, %d", op, node->ty->ptr->size);
     else
         emit("%s A, 1", op);
@@ -633,7 +634,7 @@ static void emit_post_inc_dec(Node *node, char *op) {
     SAVE;
     emit_expr(node->operand);
     push("A");
-    if(node->ty->kind == KIND_PTR)
+    if (node->ty->kind == KIND_PTR)
         emit("%s A, %d", op, node->ty->ptr->size);
     else
         emit("%s A, 1", op);
@@ -665,36 +666,39 @@ static void emit_call_builtin(char *fname) {
 static void emit_literal(Node *node) {
     SAVE;
     switch (node->ty->kind) {
-    case KIND_BOOL:
-    case KIND_CHAR:
-    case KIND_SHORT:
-        emit("mov A, %d", MOD24(node->ival));
-        break;
-    case KIND_INT:
-    case KIND_LONG:
-    case KIND_LLONG: {
-        emit("mov A, %d", MOD24(node->ival));
-        break;
-    }
-    case KIND_FLOAT:
-    case KIND_DOUBLE:
-    case KIND_LDOUBLE: {
-        assert_float();
-        break;
-    }
-    case KIND_ARRAY: {
-        if (!node->slabel) {
-            node->slabel = make_label();
-            emit_noindent(".data");
-            emit_label(node->slabel);
-            emit(".string \"%s\"", quote_cstring_len(node->sval, node->ty->size - 1));
-            emit_noindent(".text");
+        case KIND_BOOL:
+        case KIND_CHAR:
+        case KIND_SHORT:
+            emit("mov A, %d", MOD24(node->ival));
+            break;
+        case KIND_INT:
+        case KIND_LONG:
+        case KIND_LLONG:
+        {
+            emit("mov A, %d", MOD24(node->ival));
+            break;
         }
-        emit("mov A, %s", node->slabel);
-        break;
-    }
-    default:
-        error("internal error");
+        case KIND_FLOAT:
+        case KIND_DOUBLE:
+        case KIND_LDOUBLE:
+        {
+            assert_float();
+            break;
+        }
+        case KIND_ARRAY:
+        {
+            if (!node->slabel) {
+                node->slabel = make_label();
+                emit_noindent(".data");
+                emit_label(node->slabel);
+                emit(".string \"%s\"", quote_cstring_len(node->sval, node->ty->size - 1));
+                emit_noindent(".text");
+            }
+            emit("mov A, %s", node->slabel);
+            break;
+        }
+        default:
+            error("internal error");
     }
 }
 
@@ -752,14 +756,14 @@ static void maybe_print_source_line(char *file, int line) {
         return;
     char **lines = map_get(source_lines, file);
     if (!lines) {
-#ifdef __eir__
+        #ifdef __eir__
         return;
-#else
+        #else
         lines = read_source_file(file);
         if (!lines)
             return;
         map_put(source_lines, file, lines);
-#endif
+        #endif
     }
     int len = 0;
     for (char **p = lines; *p; p++)
@@ -844,21 +848,20 @@ static void emit_builtin_va_start(Node *node) {
 
 #endif
 
-static void emit_builtin_gadget_address(Node* node)
-{
+static void emit_builtin_gadget_address(Node *node) {
     SAVE;
     assert(vec_len(node->args) == 1);
-    Node* n2 = vec_head(node->args);
-    if(n2->kind == AST_CONV)
+    Node *n2 = vec_head(node->args);
+    if (n2->kind == AST_CONV)
         n2 = n2->operand;
     assert(n2->kind == AST_LITERAL && n2->ty->kind == KIND_ARRAY);
-    const char* gadget = n2->sval;
+    const char *gadget = n2->sval;
     emit(".gadget_addr A, %s", gadget);
 }
 
 static bool maybe_emit_builtin(Node *node) {
     SAVE;
-#if 0
+    #if 0
     if (!strcmp("__builtin_return_address", node->fname)) {
         emit_builtin_return_address(node);
         return true;
@@ -871,9 +874,8 @@ static bool maybe_emit_builtin(Node *node) {
         emit_builtin_va_start(node);
         return true;
     }
-#endif
-    if(!strcmp("___builtin_gadget_addr", node->fname))
-    {
+    #endif
+    if (!strcmp("___builtin_gadget_addr", node->fname)) {
         emit_builtin_gadget_address(node);
         return true;
     }
@@ -938,21 +940,21 @@ static void emit_func_call(Node *node) {
         emit_call(node);
     } else if (!strcmp(node->fname, "___builtin_dump")) {
         emit("dump");
-    /*} else if (!strcmp(node->fname, "exit")) {
-        emit("exit");
-    } else if (!strcmp(node->fname, "putchar")) {
-        emit("putc A");
-    } else if (!strcmp(node->fname, "getchar")) {
-        char *end = make_label();
-        emit("getc A");
-        emit("jne %s, A, 0", end);
-        emit("mov A, -1");
-        emit_label(end);*/
+        /*} else if (!strcmp(node->fname, "exit")) {
+            emit("exit");
+        } else if (!strcmp(node->fname, "putchar")) {
+            emit("putc A");
+        } else if (!strcmp(node->fname, "getchar")) {
+            char *end = make_label();
+            emit("getc A");
+            emit("jne %s, A, 0", end);
+            emit("mov A, -1");
+            emit_label(end);*/
     } else {
         emit_call(node);
     }
     if (vec_len(ints))
-        emit("sub SP, %d", -8*vec_len(ints));
+        emit("sub SP, %d", -8 * vec_len(ints));
     stackpos -= vec_len(ints);
     assert(opos == stackpos);
 }
@@ -1118,52 +1120,52 @@ static void emit_expr(Node *node) {
     SAVE;
     maybe_print_source_loc(node);
     switch (node->kind) {
-    case AST_LITERAL: emit_literal(node); return;
-    case AST_LVAR:    emit_lvar(node); return;
-    case AST_GVAR:    emit_gvar(node); return;
-    case AST_FUNCDESG: emit_addr(node); return;
-    case AST_FUNCALL:
-        if (maybe_emit_builtin(node))
+        case AST_LITERAL: emit_literal(node); return;
+        case AST_LVAR:    emit_lvar(node); return;
+        case AST_GVAR:    emit_gvar(node); return;
+        case AST_FUNCDESG: emit_addr(node); return;
+        case AST_FUNCALL:
+            if (maybe_emit_builtin(node))
+                return;
+            // fall through
+        case AST_FUNCPTR_CALL:
+            emit_func_call(node);
             return;
-        // fall through
-    case AST_FUNCPTR_CALL:
-        emit_func_call(node);
-        return;
-    case AST_DECL:    emit_decl(node); return;
-    case AST_CONV:    emit_conv(node); return;
-    case AST_ADDR:    emit_addr(node->operand); return;
-    case AST_DEREF:   emit_deref(node); return;
-    case AST_IF:
-    case AST_TERNARY:
-        emit_ternary(node);
-        return;
-    case AST_GOTO:    emit_goto(node); return;
-    case AST_LABEL:
-        if (node->newlabel)
-            emit_label(node->newlabel);
-        return;
-    case AST_RETURN:  emit_return(node); return;
-    case AST_COMPOUND_STMT: emit_compound_stmt(node); return;
-    case AST_STRUCT_REF:
-        emit_load_struct_ref(node->struc, node->ty, 0);
-        return;
-    case OP_PRE_INC:   emit_pre_inc_dec(node, "add"); return;
-    case OP_PRE_DEC:   emit_pre_inc_dec(node, "sub"); return;
-    case OP_POST_INC:  emit_post_inc_dec(node, "add"); return;
-    case OP_POST_DEC:  emit_post_inc_dec(node, "sub"); return;
-    case '!': emit_lognot(node); return;
-    case '&': emit_bitand(node); return;
-    case '|': emit_bitor(node); return;
-    case '~': emit_bitnot(node); return;
-    case OP_LOGAND: emit_logand(node); return;
-    case OP_LOGOR:  emit_logor(node); return;
-    case OP_CAST:   emit_cast(node); return;
-    case ',': emit_comma(node); return;
-    case '=': emit_assign(node); return;
-    case OP_LABEL_ADDR: emit_label_addr(node); return;
-    case AST_COMPUTED_GOTO: emit_computed_goto(node); return;
-    default:
-        emit_binop(node);
+        case AST_DECL:    emit_decl(node); return;
+        case AST_CONV:    emit_conv(node); return;
+        case AST_ADDR:    emit_addr(node->operand); return;
+        case AST_DEREF:   emit_deref(node); return;
+        case AST_IF:
+        case AST_TERNARY:
+            emit_ternary(node);
+            return;
+        case AST_GOTO:    emit_goto(node); return;
+        case AST_LABEL:
+            if (node->newlabel)
+                emit_label(node->newlabel);
+            return;
+        case AST_RETURN:  emit_return(node); return;
+        case AST_COMPOUND_STMT: emit_compound_stmt(node); return;
+        case AST_STRUCT_REF:
+            emit_load_struct_ref(node->struc, node->ty, 0);
+            return;
+        case OP_PRE_INC:   emit_pre_inc_dec(node, "add"); return;
+        case OP_PRE_DEC:   emit_pre_inc_dec(node, "sub"); return;
+        case OP_POST_INC:  emit_post_inc_dec(node, "add"); return;
+        case OP_POST_DEC:  emit_post_inc_dec(node, "sub"); return;
+        case '!': emit_lognot(node); return;
+        case '&': emit_bitand(node); return;
+        case '|': emit_bitor(node); return;
+        case '~': emit_bitnot(node); return;
+        case OP_LOGAND: emit_logand(node); return;
+        case OP_LOGOR:  emit_logor(node); return;
+        case OP_CAST:   emit_cast(node); return;
+        case ',': emit_comma(node); return;
+        case '=': emit_assign(node); return;
+        case OP_LABEL_ADDR: emit_label_addr(node); return;
+        case AST_COMPUTED_GOTO: emit_computed_goto(node); return;
+        default:
+            emit_binop(node);
     }
 }
 
@@ -1183,23 +1185,24 @@ static void emit_padding(Node *node, int off) {
 
 static void emit_data_addr(Node *operand, int depth) {
     switch (operand->kind) {
-    case AST_LVAR: {
-        char *label = make_label();
-        emit(".data %d", depth + 1);
-        emit_label(label);
-        do_emit_data(operand->lvarinit, operand->ty->size, 0, depth + 1);
-        emit(".data %d", depth);
-        emit(".ptr %s", label);
-        return;
-    }
-    case AST_GVAR:
-        emit(".ptr %s", operand->glabel);
-        return;
-    case AST_FUNCDESG:
-        emit(".ptr %s", operand->fname);
-        return;
-    default:
-        error("internal error");
+        case AST_LVAR:
+        {
+            char *label = make_label();
+            emit(".data %d", depth + 1);
+            emit_label(label);
+            do_emit_data(operand->lvarinit, operand->ty->size, 0, depth + 1);
+            emit(".data %d", depth);
+            emit(".ptr %s", label);
+            return;
+        }
+        case AST_GVAR:
+            emit(".ptr %s", operand->glabel);
+            return;
+        case AST_FUNCDESG:
+            emit(".ptr %s", operand->fname);
+            return;
+        default:
+            error("internal error");
     }
 }
 
@@ -1214,62 +1217,63 @@ static void emit_data_charptr(char *s, int depth) {
 
 static void emit_data_primtype(Type *ty, Node *val, int depth) {
     switch (ty->kind) {
-    case KIND_FLOAT: {
-        assert_float();
-        break;
-    }
-    case KIND_DOUBLE:
-        assert_float();
-        break;
-    case KIND_BOOL:
-        emit(".byte %d", !!eval_intexpr(val, NULL));
-        break;
-    case KIND_CHAR:
-        emit(".byte %d", eval_intexpr(val, NULL));
-        break;
-    case KIND_SHORT:
-        emit(".short %d", eval_intexpr(val, NULL));
-        break;
-    case KIND_INT:
-        emit(".int %d", eval_intexpr(val, NULL));
-        break;
-    case KIND_LONG:
-    case KIND_LLONG:
-        emit(".long %d", eval_intexpr(val, NULL));
-    case KIND_PTR:
-        if (val->kind == OP_LABEL_ADDR) {
-            emit(".ptr %s", val->newlabel);
+        case KIND_FLOAT:
+        {
+            assert_float();
             break;
         }
-        bool is_char_ptr = (val->operand->ty->kind == KIND_ARRAY && val->operand->ty->ptr->kind == KIND_CHAR);
-        if (is_char_ptr) {
-            emit_data_charptr(val->operand->sval, depth);
-        } else if (val->kind == AST_GVAR) {
-            emit(".ptr %s", val->glabel);
-        } else {
-            Node *base = NULL;
-            int v = eval_intexpr(val, &base);
-            if (base == NULL) {
-                emit(".ptr %u", v);
+        case KIND_DOUBLE:
+            assert_float();
+            break;
+        case KIND_BOOL:
+            emit(".byte %d", !!eval_intexpr(val, NULL));
+            break;
+        case KIND_CHAR:
+            emit(".byte %d", eval_intexpr(val, NULL));
+            break;
+        case KIND_SHORT:
+            emit(".short %d", eval_intexpr(val, NULL));
+            break;
+        case KIND_INT:
+            emit(".int %d", eval_intexpr(val, NULL));
+            break;
+        case KIND_LONG:
+        case KIND_LLONG:
+            emit(".long %d", eval_intexpr(val, NULL));
+        case KIND_PTR:
+            if (val->kind == OP_LABEL_ADDR) {
+                emit(".ptr %s", val->newlabel);
                 break;
             }
-            Type *ty = base->ty;
-            if (base->kind == AST_CONV || base->kind == AST_ADDR)
-                base = base->operand;
-            if (base->kind != AST_GVAR)
-                error("global variable expected, but got %s", node2s(base));
-            assert(ty->ptr);
-#if 1
-            if (v * ty->ptr->size)
-                error("TODO: fix! %d %d", v, ty->ptr->size);
-            emit(".ptr %s", base->glabel);
-#else
-            emit(".ptr %s+%u", base->glabel, v * ty->ptr->size);
-#endif
-        }
-        break;
-    default:
-        error("don't know how to handle\n  <%s>\n  <%s>", ty2s(ty), node2s(val));
+            bool is_char_ptr = (val->operand->ty->kind == KIND_ARRAY && val->operand->ty->ptr->kind == KIND_CHAR);
+            if (is_char_ptr) {
+                emit_data_charptr(val->operand->sval, depth);
+            } else if (val->kind == AST_GVAR) {
+                emit(".ptr %s", val->glabel);
+            } else {
+                Node *base = NULL;
+                int v = eval_intexpr(val, &base);
+                if (base == NULL) {
+                    emit(".ptr %u", v);
+                    break;
+                }
+                Type *ty = base->ty;
+                if (base->kind == AST_CONV || base->kind == AST_ADDR)
+                    base = base->operand;
+                if (base->kind != AST_GVAR)
+                    error("global variable expected, but got %s", node2s(base));
+                assert(ty->ptr);
+                #if 1
+                if (v * ty->ptr->size)
+                    error("TODO: fix! %d %d", v, ty->ptr->size);
+                emit(".ptr %s", base->glabel);
+                #else
+                emit(".ptr %s+%u", base->glabel, v * ty->ptr->size);
+                #endif
+            }
+            break;
+        default:
+            error("don't know how to handle\n  <%s>\n  <%s>", ty2s(ty), node2s(val));
     }
 }
 
@@ -1285,7 +1289,7 @@ static void do_emit_data(Vector *inits, int size, int off, int depth) {
             assert(node->totype->bitoff == 0);
             long data = eval_intexpr(v, NULL);
             Type *totype = node->totype;
-            for (i++ ; i < vec_len(inits); i++) {
+            for (i++; i < vec_len(inits); i++) {
                 node = vec_get(inits, i);
                 if (node->totype->bitsize <= 0) {
                     break;
@@ -1319,10 +1323,10 @@ static void do_emit_data(Vector *inits, int size, int off, int depth) {
 static void emit_data(Node *v, int off, int depth) {
     SAVE;
     emit(".data %d", depth);
-#if 0
+    #if 0
     if (!v->declvar->ty->isstatic)
         emit_noindent(".global %s", v->declvar->glabel);
-#endif
+    #endif
     emit_noindent("%s:", v->declvar->glabel);
     do_emit_data(v->declinit, v->declvar->ty->size, off, depth);
 }
@@ -1330,17 +1334,17 @@ static void emit_data(Node *v, int off, int depth) {
 static void emit_bss(Node *v) {
     SAVE;
     emit(".data");
-#if 0
+    #if 0
     if (!v->declvar->ty->isstatic)
         emit(".global %s", v->declvar->glabel);
     emit(".lcomm %s, %d", v->declvar->glabel, v->declvar->ty->size);
-#else
+    #else
     int i;
     emit("%s:\n", v->declvar->glabel);
     for (i = 0; i < v->declvar->ty->size && v->declvar->ty->size != -1; i++) {
-      emit(".byte 0");
+        emit(".byte 0");
     }
-#endif
+    #endif
 }
 
 static void emit_global_var(Node *v) {
