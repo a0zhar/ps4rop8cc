@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define MAX_LINES 1000
+#define MAX_LINES       1000
 #define MAX_LINE_LENGTH 256
 
 char lines[MAX_LINES][MAX_LINE_LENGTH];
@@ -45,8 +45,8 @@ void process_lines() {
                 }
             }
             for (ii = 0; ii < ncalls_count; ii++) {
-                char nativecall[MAX_LINE_LENGTH];
-                snprintf(nativecall, MAX_LINE_LENGTH, "nativecall ._native_%s", ncalls[ii]);
+                char nativecall[MAX_LINE_LENGTH+1]={0};
+                snprintf(nativecall, sizeof(nativecall)-1, "nativecall ._native_%s", ncalls[ii]);
                 add_line(lines2, &lines2_count, nativecall);
             }
         }

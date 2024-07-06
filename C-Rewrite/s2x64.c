@@ -1,7 +1,8 @@
- 
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include <assert.h>
 
 #define MAX_LINE_LENGTH 1024
@@ -23,7 +24,7 @@ const char *conds[][2] = {
     {"ge", "ge"}
 };
 
-const char* get_reg(const char *reg) {
+const char *get_reg(const char *reg) {
     for (int i = 0; i < sizeof(reg_map) / sizeof(reg_map[0]); i++) {
         if (strcmp(reg_map[i][0], reg) == 0) {
             return reg_map[i][1];
@@ -32,7 +33,7 @@ const char* get_reg(const char *reg) {
     return reg;
 }
 
-const char* get_cond(const char *cond) {
+const char *get_cond(const char *cond) {
     for (int i = 0; i < sizeof(conds) / sizeof(conds[0]); i++) {
         if (strcmp(conds[i][0], cond) == 0) {
             return conds[i][1];
@@ -141,10 +142,12 @@ void handle_command(char *cmd, char *args[]) {
     } else if (strcmp(cmd, ".ptr") == 0) {
         print_instruction("dq %s", args[0]);
     } else if (strcmp(cmd, ".gadget_addr") == 0) {
-     
+
         assert(strncmp(args[1], "dq ", 3) == 0);
         print_instruction("mov %s, %s", get_reg(args[0]), args[1] + 3);
     } else {
         assert(0 && "Unknown command");
     }
 }
+
+// IMPLEMENT REST HERE
