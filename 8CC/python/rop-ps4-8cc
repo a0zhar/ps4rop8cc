@@ -1,50 +1,83 @@
 #!/bin/bash
 
+# Store the path of this script itself
 self="$0"
 
-if [ "x${self:0:1}" != x/ ]
-then self="$PWD/$self"
+# Check if the script path is an absolute path, and if not
+# convert to absolute path
+if ["x${self:0:1}" != x/]
+    then self="$PWD/$self"
 fi
 
+# Get the directory of the script
 self="$(dirname "$self")"
 
+# Create a temporary directory for intermediate files
 temp="$(mktemp -d)"
 
-failure ()
-{
-    if [ "x$KEEPTEMP" == x ]
-    then rm -rf "$temp"
+# Function to handle failure scenarios
+failure () {
+    # If KEEPTEMP is not set, remove the temporary directory
+    if ["x$KEEPTEMP" == x]
+       then rm -rf "$temp"
     fi
     exit 1
 }
 
+# First argument is the output file, then we shift arguments 
+# so $1 becomes the next argument
 out_o="$1"
 shift
 
+# Compile the crt_rop.c file to assembly and store in temporary file
 "$self/../8cc" "$self/../crt/crt_rop.c" -S -o "$temp/pp.s" || failure
+
+# Copy the generated assembly to the linked.s file
 cat "$temp/pp.s" > "$temp/linked.s" || failure
+
+# Create an empty custom.rop file
 touch "$temp/custom.rop"
 
-while [ "x$1" != x ]
-do
-ii="$1"
-ll="${#ii}"
-ll="$((ll-4))"
-if [ "${ii:ll}" == ".rop" ]
-then cat "$ii" >> "$temp/custom.rop"
-else
-cat > "$temp/pp.c" << EOF
+# Loop through all remaining arguments
+while ["x$1" != x] do
+    ii="$1"
+    ll="${#ii}"
+    ll="$((ll-4))"
+    # Check if the file has a .rop extension, and if true then we
+    # concatenate the contents of the .rop file to custom.rop
+    if ["${ii:ll}" == ".rop"]
+       then cat "$1" >> "$temp/custom.rop"
+    else
+        # Generate a C file with built-in functions
+        cat > "$temp/pp.c" << EOF
 unsigned short __builtin_bswap16(unsigned short);
 unsigned int __builtin_bswap32(unsigned int);
 unsigned long long __builtin_bswap64(unsigned long long);
 EOF
-cpp -D__PS4__ -DPRINTF_DISABLE_SUPPORT_FLOAT '-D__asm__(...)=' '-D__restrict=' '-D__extension__=' '-D__builtin_va_list=int' '-D__inline=' '-D__attribute__(x)=' '-D__asm(...)=' '-D__builtin_offsetof(a, b)=(((char*)&((a*)0)->b)-(char*)0)' -isystem "$self/../include" -isystem "$self/../.." -isystem "$self/../../freebsd-headers" -nostdinc "$1" >> "$temp/pp.c" || failure
-"$self/../8cc" "$temp/pp.c" -S -o "$temp/pp.s" || failure
-cat "$temp/pp.s" >> "$temp/linked.s" || failure
-echo >> "$temp/linked.s" || failure
-fi
-shift
+        # Preprocess the C file with specific definitions and include paths
+        cpp -D__PS4__ -DPRINTF_DISABLE_SUPPORT_FLOAT                                     \
+            '-D__asm__(...)=' '-D__restrict=' '-D__extension__='                         \
+            '-D__builtin_va_list=int' '-D__inline=' '-D__attribute__(x)='                \
+            '-D__asm(...)=' '-D__builtin_offsetof(a, b)=(((char*)&((a*)0)->b)-(char*)0)' \
+            -isystem "$self/../include"                                                  \
+            -isystem "$self/../.."                                                       \
+            -isystem "$self/../../freebsd-headers"                                       \
+            -nostdinc "$1" >> "$temp/pp.c" || failure
+
+        # Compile the preprocessed C file to assembly
+        "$self/../8cc" "$temp/pp.c" -S -o "$temp/pp.s" || failure
+
+        # Concatenate the generated assembly to linked.s
+        cat "$temp/pp.s" >> "$temp/linked.s" || failure
+
+        # Add a newline to linked.s
+        echo >> "$temp/linked.s" || failure
+    fi
+    # Move to the next argument
+    shift
 done
+
+# Append hand-written ROP to linked.rop
 cat >> "$temp/linked.rop" << EOF
 \$\$var main_ret = malloc(8);
 \$\$var printf_buf = malloc(65536);
@@ -83,8 +116,14 @@ _pivot_back_addr:
 dq 0
 \$pivot_addr
 EOF
+
+# Process the linked.s file through nativecalls.py and s2rop.py, append to linked.rop
 python3 "$self/nativecalls.py" < "$temp/linked.s" | python3 "$self/s2rop.py" >> "$temp/linked.rop" || failure
+
+# Append custom.rop contents to linked.rop
 cat "$temp/custom.rop" >> "$temp/linked.rop"
+
+# Append final ROP instructions to linked.rop
 cat >> "$temp/linked.rop" << EOF
 \$\$pivot(ropchain);
 \$\$var main_ret = read_ptr_at(main_ret);
@@ -94,8 +133,11 @@ cat >> "$temp/linked.rop" << EOF
 \$\$var _ = malloc_nogc.pop();
 \$\$var _ = malloc_nogc.pop();
 EOF
+
+# Write the final output to the specified output file
 cat "$temp/linked.rop" > "$out_o"
 
-if [ "x$KEEPTEMP" == x ]
-then rm -rf "$temp"
+# Clean up temporary files if KEEPTEMP is not set
+if ["x$KEEPTEMP" == x]
+   then rm -rf "$temp"
 fi
